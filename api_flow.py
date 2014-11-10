@@ -1,5 +1,6 @@
 from asana import asana
 from coneptum_asana import ConeptumAsanaAPI
+import traceback
 
 class FlowElement(object):
     def __init__(self,connector=None,method=None,connector_largs=[],connector_kwargs={}):
@@ -9,6 +10,7 @@ class FlowElement(object):
         self.method=method
         if type(self)!=NullProcessor:
             self.out_objects=[NullProcessor()]
+            self.error_objects=[NullProcessor()]
     def compute_args(self,elem={}):
         new_largs=[x for x in self.connector_largs]
         new_kwargs=self.connector_kwargs.copy()
@@ -22,9 +24,15 @@ class FlowElement(object):
     def out(self,*out_objects):
         self.out_objects=out_objects
         return self
+    def error(self,*error_objects):
+        self.error_objects=error_objects
+        return self
 
     def out_elem(self,e):
         for o in self.out_objects:
+            o.process(e)
+    def error_elem(self,e):
+        for o in self.error_objects:
             o.process(e)
 
 class NullProcessor(FlowElement):
@@ -40,21 +48,53 @@ class ListProcessor(FlowElement):
 class ElementProcessor(FlowElement):
     def process(self,elem={}):
         largs,kwargs=self.compute_args(elem)
-        self.out_elem(getattr(self.connector,self.method)(*largs,**kwargs))
+        try:
+            self.out_elem(getattr(self.connector,self.method)(*largs,**kwargs))
+        except:
+            error=traceback.format_exc()
+            elem['error']=error
+            self.error_elem(elem)
+
+
 
 class ElementFilter(FlowElement):
     def __init__(self,filter=None):
         self.filter=filter
         self.out_objects=[NullProcessor()]
+        self.error_objects=[NullProcessor()]
     def process(self,elem={}):
         if not self.filter or self.filter.evaluate(elem):
             self.out_elem(elem)
+
+class ListAcumulator(FlowElement):
+    def __init__(self):
+        self.list=[]
+        self.out_objects=[NullProcessor()]
+        self.error_objects=[NullProcessor()]
+    def process(self,elem={}):
+        self.list.append(elem)
+        self.out_elem(elem)
+
+    def count(self):
+        return len(self.list)
+
+class BreakPoint(FlowElement):
+    def __init__(self,*debug_vars):
+        self.list=[]
+        self.out_objects=[NullProcessor()]
+        self.error_objects=[NullProcessor()]
+        self.debug_vars=debug_vars
+    def process(self,elem={}):
+        import pdb
+        pdb.set_trace()
+        self.out_elem(elem)
 
 
 class Printer(FlowElement):
     def __init__(self,prefix=''):
         self.prefix=prefix
         self.out_objects=[NullProcessor()]
+        self.error_objects=[NullProcessor()]
     def process(self,elem):
         print self.prefix,elem
         self.out_elem(elem)
@@ -62,6 +102,7 @@ class Printer(FlowElement):
 class ElementTransformer(FlowElement):
     def __init__(self):
         self.out_object=[NullProcessor()]
+        self.error_objects=[NullProcessor()]
     def process(self,elem):
         self.out_elem(self.transform(elem))
     def transform(self,elem):
@@ -102,6 +143,7 @@ class TxTask(ElementTransformer):
         if 9564532017776 in elem['hearts']:
             elem['hearts'].remove(9564532017776)
         elem['projects']=[x['id'] for x in elem['projects']]
+        elem['tags']=[x['id'] for x in elem['tags']]
         elem['workspace']=elem['workspace']['id']
         if 'parent' in elem.keys() and elem['parent']:
             #elem['parent']=elem['parent']['id']

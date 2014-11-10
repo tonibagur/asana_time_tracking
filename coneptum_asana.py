@@ -26,10 +26,10 @@ class ConeptumAsanaAPI(object):
     itself see: http://developer.asana.com/documentation/
     """
 
-    def __init__(self, apikey, debug=False):
+    def __init__(self, apikey, api_version='asana_db',debug=False):
         self.debug = debug
         self.asana_url = "http://agents.coneptum.com:5003"
-        self.api_version = "asana_db"
+        self.api_version = api_version
         self.aurl = "/".join([self.asana_url, self.api_version])
         self.apikey = apikey
         self.bauth = self.get_basic_auth()
