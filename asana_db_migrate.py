@@ -24,30 +24,30 @@ def migrate_db():
     get_tasks=ListAcumulator()
     pre_tracks=ListAcumulator()
     post_tracks=ListAcumulator()
-    bp=BreakPoint(error_time_tracking,error_get_task,pre_tracks,get_tasks,put_tasks,post_tracks)
+    bp=BreakPoint(error_time_tracking=error_time_tracking,error_get_task=error_get_task,pre_tracks=pre_tracks,get_tasks=get_tasks,put_tasks=put_tasks,post_tracks=post_tracks)
     migrator=ZODBMigrator()
     asana_api = asana.AsanaAPI('2vzk6F5m.kow34uB7cmjXnebCK0NBbYI', debug=False)
     coneptum_asana=ConeptumAsanaAPI('','time_tracking',debug=True)
     coneptum_asana2=ConeptumAsanaAPI('','asana_db',debug=True)
     asana_api = asana.AsanaAPI('2vzk6F5m.kow34uB7cmjXnebCK0NBbYI', debug=False)
     ListProcessor(migrator,'get_tracks').out(
-        ElementFilter(Ev("elem['task']==17065298387027")).out(
-            Printer("+++Tracks"),
-            pre_tracks,
-            ElementProcessor(asana_api,'get_task',[Ev("elem['task']")],{}).out(
-                Printer('----Task'),
-                get_tasks,
-                TxTask().out(
-                    ElementProcessor(coneptum_asana2,'_asana_put',(Ev("'tasks/'+str(elem['id'])"),Ev("elem"))),
-                    put_tasks,
-                )
-            ).error(error_get_task),
+        Printer("+++Tracks"),
+        pre_tracks,
+        ElementProcessor(asana_api,'get_task',[Ev("elem['task']")],{}).out(
+            Printer('----Task'),
+            get_tasks,
+            TxTask().out(
+                ElementProcessor(coneptum_asana2,'_asana_put',(Ev("'tasks/'+str(elem['id'])"),Ev("elem"))),
+                put_tasks,
+            )
+        ).error(error_get_task).out_in(
             post_tracks,
             ElementProcessor(coneptum_asana,'_asana_post',('time_tracking',Ev("elem"))).error(error_time_tracking,bp),
-        )
+        )  
     ).process()
     print "Errors time tracking", error_time_tracking.count()
-    print "Detail", error_time_tracking.list
+    print "Errors get_task", error_get_task.count()
+    print "Detail", error_get_task.list
 
 
 if __name__=='__main__':
